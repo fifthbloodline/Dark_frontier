@@ -1,0 +1,5 @@
+# Location
+CurrentLocation = StartSpawnLocation
+
+# Define Starting Spawn Location
+StartingSpawnX = 

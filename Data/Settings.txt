@@ -1,0 +1,9 @@
+# Display
+ScreenWidth = 900
+ScreenHeight = 1600
+
+# Audio
+VolumeMaster = 100
+VolumeMusic = 50
+VolumeEffects = 100
+VolumeDialog = 100 
