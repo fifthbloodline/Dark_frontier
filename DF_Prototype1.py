@@ -8,6 +8,9 @@ import json
 from pathlib import Path
 from random import randint
 
+#Todo: Add Background
+#Todo: Add Thrust Animation
+
 pygame.init()
 # GarbageGoober = []
 # for item in GarbageGoober:
@@ -22,6 +25,7 @@ Fuel: int = 500
 accY: float = 0.00
 #accX: float = 0.00
 score: int = 0
+PlayerSpeed: int = 0
 GameState: bytes = 0 #0: Title Screen, 1: Game, 2: Game Over, 3: Highscores, 4: Add Highscore
 screenFocus: bytes = 0 #0: unbound, 1: player, 2: other
 name: str = ""
@@ -60,12 +64,15 @@ def CheckCollision():
             #print("you Unalived :(")
     if PlayerActor.colliderect(LandingPad):
         if PlayerProp[1] < 90.00 and PlayerProp[1] > 0 and GameState == 1:
+            sounds.lowfrequency_explosion_001.play()# type: ignore (supresses warnings)
             #PlayerActor.pos = WIDTH/2, 100
             PlayerProp = [0-randint(-350,0), randint(-150,300)]
             score += 1
             Fuel += randint(100,150)
             #print("you win!")
         elif PlayerProp[1] > 90.00: 
+            sounds.thrusterfire_003.stop() # type: ignore (supresses warnings)
+            sounds.explosioncrunch_000.play() # type: ignore (supresses warnings)
             GameState = 2
             #print("you Unalived :(")
 
@@ -73,8 +80,11 @@ def CheckCollision():
 #display Highscore
 def CreateScoreboard(scores: dict):
     scoreboardstring = ''
+    i = 1
     for k, v in scores.items():
-        scoreboardstring += k + ': ' + str(v) + '\n'
+        if i <= 10:
+            scoreboardstring += str(i) + ': ' + k + ': ' + str(v) + '\n'
+            i += 1
     return scoreboardstring
 
 def ResetGame():
@@ -119,23 +129,9 @@ LandingPad = Actor('spacestation_032')
 LandingPad.pos = WIDTH/2, HEIGHT-100
 #endregion
 
-def on_key_down(key, mod, unicode):
-    global name, GameState, HighScores,highscorePath
-    if GameState == 4:
-        if key != pygame.K_BACKSPACE and key != pygame.K_RETURN:
-            name += unicode
-        elif key == pygame.K_BACKSPACE:
-            name = name[:-1]
-        elif key == pygame.K_RETURN: # type: ignore (supresses warnings)
-            #if HighScores[name] > score:
-                #HighScores[name+'copy'] = score
-                #HighScores = SortDict(HighScores,True)
-            #else:
-            HighScores[name] = score
-            HighScores = SortDict(HighScores,True)
-            WriteJSON(HighScores, highscorePath)
-            GameState = 3
+#region ---- Sounds ----
 
+#endregion
 
 
 #region ---- User Inputs ----
@@ -152,6 +148,7 @@ def UserInputs():
         elif accY < 0:
             accY += 50 #throttle down of 50 makes the down throttle snappy but not so much it can't be toggled
         else:
+            sounds.thrusterfire_003.stop() # type: ignore (supresses warnings)
             accY = 0
     if GameState == 2:
         if keyboard.R: # type: ignore (supresses warnings)
@@ -167,23 +164,45 @@ def UserInputs():
             GameState = 4
     if GameState == 4:
         if keyboard.RETURN: # type: ignore (supresses warnings)
-            if HighScores[name] > score:
-                HighScores[name+'copy'] = score
+            if HighScores[str(name)] > score: #Todo: prevent overriting of higher scores
+                HighScores[name + ' copy'] = score
                 HighScores = SortDict(HighScores,True)
             else:
-                HighScores[name] = score
+                HighScores[str(name)] = score
                 HighScores = SortDict(HighScores,True)
             WriteJSON(HighScores, highscorePath)
             GameState = 3
+        if keyboard.ESCAPE: # type: ignore (supresses warnings)
+            GameState = 3
             
 
-
+def on_key_down(key, mod, unicode):
+    global name, GameState, HighScores,highscorePath
+    if GameState == 1:
+        if (key == pygame.K_SPACE):
+            sounds.thrusterfire_003.play(-1) # type: ignore (supresses warnings)
+    if GameState == 4:
+        if key != pygame.K_BACKSPACE and key != pygame.K_RETURN and key != pygame.K_ESCAPE:
+            name += unicode
+        elif key == pygame.K_BACKSPACE:
+            name = name[:-1]
+        elif key == pygame.K_BACKSPACE:
+            GameState = 3
+        elif key == pygame.K_RETURN: # type: ignore (supresses warnings)
+            #if HighScores[name] > score:
+                #HighScores[name+'copy'] = score
+                #HighScores = SortDict(HighScores,True)
+            #else:
+            HighScores[name] = score
+            HighScores = SortDict(HighScores,True)
+            WriteJSON(HighScores, highscorePath)
+            GameState = 3
 #endregion
         
 #region ---- Update Function ----
 def update(dt): #update(dt) allows pgz to automatically pass dt into the function
     #using globals
-    global accY, Gravity, SimSpeed, PlayerProp, GameState
+    global accY, Gravity, SimSpeed, PlayerProp, GameState, PlayerSpeed
 
     UserInputs() #check user inputs
 
@@ -205,13 +224,21 @@ def update(dt): #update(dt) allows pgz to automatically pass dt into the functio
 
         #animate player
         animate(PlayerActor, pos=(WIDTH/2,PlayerProp[0]), tween='linear', duration=dt) #type: ignore
+        #if (accY !=0):
+            #if accY < 250
+
+        # update absolute player speed
+        if (PlayerProp[1]<0):
+            PlayerSpeed = PlayerProp[1] * -1
+        else:
+            PlayerSpeed = PlayerProp[1]
     
     
 #endregion
 
 #region ---- Draw Function ----
 def draw():
-    global HighScores, score, Fuel, accY, name, GameState
+    global HighScores, score, Fuel, accY, name, GameState, PlayerSpeed
     screen.fill((20,20,40)) # Background, #type: ignore (supresses warnings)
     if GameState == 0:
         screen.draw.text('DARK FRONTIER V0.1', center=(WIDTH/2, HEIGHT/2-50), color=(255,15,15), fontsize=120) # type: ignore (supresses warnings)
@@ -221,7 +248,7 @@ def draw():
         LandingPad.draw()
         screen.draw.text('Score: ' + str(score), (15,10), color=(255,255,255), fontsize=60) # type: ignore (supresses warnings)
         screen.draw.text('Thrust: ' + str(-accY), (15, 60), color=(255,255,255), fontsize=30)# type: ignore (supresses warnings) 
-        screen.draw.text('Speed: ' + str("{:.2f}".format(PlayerProp[1])), (15, 90), color=(255,255,255), fontsize=30) # type: ignore (supresses warnings)
+        screen.draw.text('Speed: ' + str("{:.2f}".format(PlayerSpeed)), (15, 90), color=(255,255,255), fontsize=30) # type: ignore (supresses warnings)
         screen.draw.text('Height: ' + str("{:.2f}".format(-PlayerProp[0]/10+80)), (15, 120), color=(255,255,255), fontsize=30) # type: ignore (supresses warnings)
         screen.draw.text('Fuel: ' + str(Fuel), (15, 150), color=(255,255,255), fontsize=30) # type: ignore (supresses warnings)
     if GameState == 2:
@@ -231,8 +258,10 @@ def draw():
     if GameState == 3:
         HighScores = SortDict(HighScores,True)
         ScoreBoardString = CreateScoreboard(HighScores)
-        screen.draw.text('Highscores:', center=(WIDTH/2, HEIGHT/5), color=(255,15,15), fontsize=90) # type: ignore (supresses warnings)
-        screen.draw.text(ScoreBoardString, midtop=(WIDTH/2, HEIGHT/5+50), color=(255,255,255), fontsize=90) # type: ignore (supresses warnings)
+        scoreBox = Rect((WIDTH/5, HEIGHT/5), (3*WIDTH/5, 3*HEIGHT/5)) 
+        screen.draw.text('Highscores:', center=(WIDTH/2, HEIGHT/6), color=(255,15,15), fontsize=90) # type: ignore (supresses warnings)
+        screen.draw.textbox(ScoreBoardString, scoreBox, color=(255,255,255)) # type: ignore (supresses warnings)
+        # screen.draw.text(, midtop=(WIDTH/2, HEIGHT/5+50), color=(255,255,255), fontsize=90) # type: ignore (supresses warnings)
         screen.draw.text('Your Score: ' + str(score), (15,10), color=(255,255,255), fontsize=60) # type: ignore (supresses warnings)
         screen.draw.text('Press R to Restart, Press SPACE to Save Your Score', center=(WIDTH/2, HEIGHT*(4/5)), color=(255,255,255), fontsize=30) # type: ignore (supresses warnings)
     if GameState == 4: # To Do: Add rect For Scoreboard
